@@ -1,4 +1,3 @@
-# src/retrieve.py
 import torch, faiss, json, argparse
 import numpy as np
 from torch.utils.data import DataLoader
