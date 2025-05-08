@@ -2,10 +2,10 @@ import os, json, random, argparse
 import torch, faiss
 import numpy as np
 from torch.utils.data import DataLoader
-from src.train_ft import main as train_main
-from src.data import make_transforms, RetrievalDataset
-from src.model import build_model, extract_embedding_model
-from src.retrieve import build_index  # assumes build_index in retrieve.py
+from train_ft import main as train_main
+from data import make_transforms, RetrievalDataset
+from model import build_model, extract_embedding_model
+from retrieve import build_index  # assumes build_index in retrieve.py
 
 
 def do_split(args):
@@ -119,12 +119,12 @@ def main():
     fp.add_argument('--train_json',   default='train_split.json')
     fp.add_argument('--val_json',     default='val_split.json')
     fp.add_argument('--split_ratio',  type=float, default=0.8)
-    fp.add_argument('--num_classes',  type=int,   default=10)
+    fp.add_argument('--num_classes',  type=int,   default=3)
     fp.add_argument('--img_size',     type=int,   default=224)
     fp.add_argument('--bs',           type=int,   default=32)
     fp.add_argument('--lr',           type=float, default=1e-3)
     fp.add_argument('--epochs',       type=int,   default=10)
-    fp.add_argument('--k',            type=int,   default=5)
+    fp.add_argument('--k',            type=int,   default=3)
     fp.add_argument('--out_model',    default='best_ft.pth')
     fp.add_argument('--idx_out',      default='gallery_idx.faiss')
     fp.add_argument('--keys_out',     default='gallery_keys.json')

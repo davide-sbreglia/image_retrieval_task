@@ -1,4 +1,4 @@
-import json, os
+import json, os, torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -16,22 +16,58 @@ def make_transforms(image_size=224, train=True):
     return transforms.Compose(base)
 
 class ClassifyDataset(Dataset):
-    def __init__(self, img_dir, labels_json, transform):
-        """
-        img_dir: folder of images
-        labels_json: map {"filename":class_id}
-        """
-        with open(labels_json) as f:
-            self.labels = json.load(f)
-        self.images = list(self.labels.keys())
-        self.img_dir = img_dir
+    def __init__(self, img_dir: str, json_path: str, transform: callable):
+        # 1) load the JSON of filename → class_name
+        with open(json_path) as f:
+            raw_labels = json.load(f)      # e.g. { "img001.jpg": "American_chameleon", … }
+
+        # 2) build a class2idx mapping from the subfolders under img_dir
+        class_names = sorted(
+            d for d in os.listdir(img_dir)
+            if os.path.isdir(os.path.join(img_dir, d))
+        )
+        class2idx = {cn: i for i, cn in enumerate(class_names)}
+
+        self.img_dir   = img_dir
         self.transform = transform
+        self.samples   = []
+
+        # 3) for every image in each class-folder, look up its class_name in the JSON,
+        #    then map that name to an integer
+        for class_name in class_names:
+            class_folder = os.path.join(img_dir, class_name)
+            for fn in os.listdir(class_folder):
+                if fn not in raw_labels:
+                    continue
+                label_name = raw_labels[fn]
+                if label_name != class_name:
+                    # if your JSON ever disagrees with the folder structure you can skip or warn
+                    continue
+                class_id = class2idx[label_name]
+                self.samples.append((class_name, fn, class_id))
     
     def __len__(self):
-        return len(self.images)
+        return len(self.samples)
 
-    def __getitem__(self, i):
-        fn = self.images[i]
-        img = Image.open(os.path.join(self.img_dir, fn)).convert("RGB")
-        return self.transform(img), self.labels[fn], fn
+    def __getitem__(self, idx):
+        class_name, fn, class_id = self.samples[idx]
+        path = os.path.join(self.img_dir, class_name, fn)
+        img = Image.open(path).convert("RGB")
+        tensor = self.transform(img)
+        label = torch.tensor(class_id, dtype=torch.long)
+        return tensor, label, fn
 
+class RetrievalDataset(Dataset):
+    def __init__(self, img_dir: str, transform: callable):
+        self.img_dir   = img_dir
+        self.transform = transform
+        self.filenames = sorted(os.listdir(img_dir))
+
+    def __len__(self):
+        return len(self.filenames)
+
+    def __getitem__(self, idx):
+        fn   = self.filenames[idx]
+        path = os.path.join(self.img_dir, fn)
+        img  = Image.open(path).convert("RGB")
+        return self.transform(img), fn

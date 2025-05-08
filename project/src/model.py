@@ -1,6 +1,12 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 from torchvision import models
+
+class L2Norm(nn.Module):
+    def forward(self, x):
+        # normalize along the feature-dimension
+        return F.normalize(x, p=2, dim=1)
 
 def build_model(num_classes):
     # 1) load pretrained EfficientNet-B0
@@ -23,5 +29,5 @@ def extract_embedding_model(model):
         model.features,
         nn.AdaptiveAvgPool2d(1),
         nn.Flatten(),
-        nn.functional.normalize  # L2-normalize embeddings
+        L2Norm()  # L2-normalize embeddings
     )

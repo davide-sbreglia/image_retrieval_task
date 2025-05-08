@@ -1,8 +1,8 @@
 import torch, argparse
 from torch import nn, optim
 from torch.utils.data import DataLoader
-from src.data  import ClassifyDataset, make_transforms
-from src.model import build_model
+from data  import ClassifyDataset, make_transforms
+from model import build_model
 
 def train_one_epoch(model, loader, loss_fn, opt, device):
     model.train(); model.to(device)
