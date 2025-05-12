@@ -50,7 +50,7 @@ def extract_embeddings(model, loader, device):
 # ----------------------------
 # Evaluate retrieval accuracy
 # ----------------------------
-def evaluate_topk(query_embs, gallery_embs, query_names, gallery_names, labels, k=5):
+def evaluate_topk(query_embs, gallery_embs, query_names, gallery_names, labels, k):
     from sklearn.metrics.pairwise import cosine_similarity
     sim = cosine_similarity(query_embs, gallery_embs)
     indices = np.argsort(sim, axis=1)[:, -k:][:, ::-1]
