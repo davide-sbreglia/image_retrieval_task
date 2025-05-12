@@ -2,7 +2,7 @@ import wandb
 
 if __name__ == "__main__":
     wandb.init(
-        project="retrieval-benchmark",
+        project="ml-competizione-retrieval",
         entity="davide-sbreglia-university-of-trento",  # <-- usa il tuo username wandb
         name="submission-selection",
         config={
