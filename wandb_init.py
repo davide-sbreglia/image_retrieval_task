@@ -8,7 +8,7 @@ if __name__ == "__main__":
         config={
             "models": ["resnet50", "efficientnet_b0", "vit_b_16", "resnet+vit", "eff+vit"],
             "evaluation_metric": "topk_accuracy",
-            "k": 5,
+            "k": 3,
             "dataset": "./data/test/query vs gallery"
         }
     )
