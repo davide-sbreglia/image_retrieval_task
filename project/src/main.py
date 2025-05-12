@@ -122,7 +122,7 @@ def main():
     fp.add_argument('--num_classes',  type=int,   default=3)
     fp.add_argument('--img_size',     type=int,   default=224)
     fp.add_argument('--bs',           type=int,   default=32)
-    fp.add_argument('--lr',           type=float, default=1e-3)
+    fp.add_argument('--lr',           type=float, default=1e-4)
     fp.add_argument('--epochs',       type=int,   default=10)
     fp.add_argument('--k',            type=int,   default=3)
     fp.add_argument('--out_model',    default='best_ft.pth')
