@@ -107,7 +107,7 @@ def main():
     fp.add_argument('--bs', type=int, default=32)
     fp.add_argument('--lr', type=float, default=1e-4)
     fp.add_argument('--epochs', type=int, default=10)
-    fp.add_argument('--k', type=int, default=3)
+    fp.add_argument('--k', type=int, default=5)
     fp.add_argument('--out_model', default='best_ft.pth')
     fp.add_argument('--idx_out', default='gallery_idx.faiss')
     fp.add_argument('--keys_out', default='gallery_keys.json')
