@@ -9,6 +9,17 @@ from model import L2Norm
 from torchvision import transforms
 from tqdm import tqdm
 
+
+def _flatten(embs: np.ndarray) -> np.ndarray:
+    """
+    Collapse any trailing dimensions so that the result is always
+    shape (n_samples, feature_dim).
+    """
+    embs = np.asarray(embs, dtype='float32')
+    if embs.ndim > 2:
+        # e.g. (batch, C, 1, 1) -> (batch, C)
+        return embs.reshape(embs.shape[0], -1)
+    return embs
 # ----------------------------
 # Build backbone models
 # ----------------------------
@@ -39,21 +50,19 @@ def extract_embeddings(model, loader, device):
     with torch.no_grad():
         for x, fn in tqdm(loader):
             x = x.to(device)
-            feat = model(x).cpu().numpy()
-            feats.append(feat)
+            emb = model(x).cpu().numpy()
+            emb = _flatten(emb)
+            feats.append(emb)
             fns.extend(fn)
     return np.vstack(feats).astype('float32'), fns
 
-# ----------------------------
-# Average of two embeddings
-# ----------------------------
-def average_embeddings(e1, e2):
-    return (e1 + e2) / 2
 
 # ----------------------------
 # Retrieval
 # ----------------------------
 def do_retrieve(query_embs, gallery_embs, gallery_keys, k):
+    gallery_embs = _flatten(gallery_embs)
+    query_embs = _flatten(query_embs)
     idx = faiss.IndexFlatIP(gallery_embs.shape[1])
     faiss.normalize_L2(gallery_embs)
     faiss.normalize_L2(query_embs)
@@ -78,8 +87,8 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     img_size = 224
     k = 5
-    query_dir = "./data/test/query"
-    gallery_dir = "./data/test/gallery"
+    query_dir = "./test/query"
+    gallery_dir = "./test/gallery"
     out_dir = "submissions"
     os.makedirs(out_dir, exist_ok=True)
 
@@ -96,6 +105,7 @@ if __name__ == "__main__":
         retrieved = do_retrieve(q_embs, g_embs, g_keys, k)
         save_submission(q_keys, retrieved, f"{out_dir}/submission_{model_name}.json")
 
+    def l2norm_np(x): return x / np.linalg.norm(x, axis=1, keepdims=True)
     # Ensemble resnet + vit
     model1, _ = get_backbone("resnet50")
     model2, _ = get_backbone("vit_b_16")
@@ -103,10 +113,15 @@ if __name__ == "__main__":
     g2, _  = extract_embeddings(model2, gallery_dl, device)
     q1, qk = extract_embeddings(model1, query_dl, device)
     q2, _  = extract_embeddings(model2, query_dl, device)
-    gavg = average_embeddings(g1, g2)
-    qavg = average_embeddings(q1, q2)
-    retrieved = do_retrieve(qavg, gavg, gk, k)
-    save_submission(qk, retrieved, f"{out_dir}/submission_resnet_vit.json")
+    g1, g2 = l2norm_np(g1), l2norm_np(g2)
+    q1, q2 = l2norm_np(q1), l2norm_np(q2)
+    sim1 = np.dot(q1, g1.T)
+    sim2 = np.dot(q2, g2.T)
+    sim_ensemble = (sim1 +sim2)/2
+    topk_indices = np.argsort(-sim_ensemble, axis=1)[:, :k]
+    retrieved = [[gk[i] for i in row] for row in topk_indices]
+    save_submission(qk, retrieved, f"{out_dir}/submission_resnet_vit_similarity.json")
+    
 
     # Ensemble efficientnet + vit
     model1, _ = get_backbone("efficientnet_b0")
@@ -115,7 +130,11 @@ if __name__ == "__main__":
     g2, _  = extract_embeddings(model2, gallery_dl, device)
     q1, qk = extract_embeddings(model1, query_dl, device)
     q2, _  = extract_embeddings(model2, query_dl, device)
-    gavg = average_embeddings(g1, g2)
-    qavg = average_embeddings(q1, q2)
-    retrieved = do_retrieve(qavg, gavg, gk, k)
-    save_submission(qk, retrieved, f"{out_dir}/submission_eff_vit.json")
+    g1, g2 = l2norm_np(g1), l2norm_np(g2)
+    q1, q2 = l2norm_np(q1),l2norm_np(q2)
+    sim1 = np.dot(q1, g1.T)
+    sim2 = np.dot(q2, g2.T)
+    sim_ensemble = (sim1+sim2)/2
+    topk_indices = np.argsort(-sim_ensemble, axis=1)[:, :k]
+    retrieved = [[gk[i] for i in row] for row in topk_indices]
+    save_submission(qk, retrieved, f"{out_dir}/submission_eff_vit_similarity.json")

@@ -1,3 +1,4 @@
+from pathlib import Path
 import json, os, torch
 from PIL import Image
 from torch.utils.data import Dataset
@@ -61,13 +62,21 @@ class RetrievalDataset(Dataset):
     def __init__(self, img_dir: str, transform: callable):
         self.img_dir   = img_dir
         self.transform = transform
-        self.filenames = sorted(os.listdir(img_dir))
+        # recursively collect all image files under img_dir
+        p = Path(img_dir)
+        patterns = ["*.jpg", "*.jpeg", "*.png", "*.bmp"]
+        self.filepaths = []
+        for pat in patterns:
+            self.filepaths += list(p.rglob(pat))
+        # sort so ordering is stable
+        self.filepaths = sorted(self.filepaths)
 
     def __len__(self):
-        return len(self.filenames)
+        return len(self.filepaths)
 
     def __getitem__(self, idx):
-        fn   = self.filenames[idx]
-        path = os.path.join(self.img_dir, fn)
+        path = self.filepaths[idx]
+        # make filename relative to img_dir for your fns list:
+        fn   = str(path.relative_to(self.img_dir))
         img  = Image.open(path).convert("RGB")
         return self.transform(img), fn
