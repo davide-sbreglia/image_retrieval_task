@@ -51,6 +51,7 @@ def extract_embeddings(model, loader, device):
 # Evaluate retrieval accuracy
 # ----------------------------
 def evaluate_topk(query_embs, gallery_embs, query_names, gallery_names, labels, k=5):
+    from sklearn.metrics.pairwise import cosine_similarity
     sim = cosine_similarity(query_embs, gallery_embs)
     indices = np.argsort(sim, axis=1)[:, -k:][:, ::-1]
     correct = 0
@@ -61,6 +62,12 @@ def evaluate_topk(query_embs, gallery_embs, query_names, gallery_names, labels, 
         correct += sum(1 for l in retrieved_labels if l == query_label)
         total += len(retrieved_labels)
     return correct / total if total else 0.0
+
+# ----------------------------
+# Average of two embeddings
+# ----------------------------
+def average_embeddings(e1, e2):
+    return (e1 + e2) / 2
 
 # ----------------------------
 # Main benchmark script
@@ -74,26 +81,37 @@ if __name__ == "__main__":
     k = 5
 
     with open(val_json) as f:
-        labels = json.load(f)  # {"filename.jpg": "classname"}
+        labels = json.load(f)
 
     tfm = make_transforms(img_size, train=False)
     loader = DataLoader(RetrievalDataset(data_dir, tfm), batch_size=batch_size, shuffle=False)
 
-    models_to_test = ["resnet50", "efficientnet_b0", "vit_b_16"]
+    wandb.init(project="retrieval-benchmark", name="full-model-comparison")
 
-    wandb.init(project="retrieval-benchmark", name="model-speed-vs-accuracy")
+    # Singoli modelli
+    single_models = ["resnet50", "efficientnet_b0", "vit_b_16"]
+    embedding_cache = {}
 
-    for name in models_to_test:
+    for name in single_models:
         model, _ = get_backbone(name)
         embs, fns, avg_time = extract_embeddings(model, loader, device)
         acc = evaluate_topk(embs, embs, fns, fns, labels, k=k)
-
-        wandb.log({
-            "model": name,
-            "topk_acc": acc,
-            "avg_time_per_image": avg_time
-        })
-
+        wandb.log({"model": name, "topk_acc": acc, "avg_time_per_image": avg_time, "type": "single"})
+        embedding_cache[name] = (embs, fns)
         print(f"✅ {name}: acc={acc:.3f}  time/img={avg_time:.4f}s")
+
+    # Ensemble resnet + vit
+    r_embs, fns = embedding_cache["resnet50"]
+    v_embs, _   = embedding_cache["vit_b_16"]
+    avg = average_embeddings(r_embs, v_embs)
+    acc = evaluate_topk(avg, avg, fns, fns, labels, k=k)
+    wandb.log({"model": "resnet+vit", "topk_acc": acc, "avg_time_per_image": None, "type": "ensemble"})
+
+    # Ensemble eff + vit
+    e_embs, fns = embedding_cache["efficientnet_b0"]
+    v_embs, _   = embedding_cache["vit_b_16"]
+    avg = average_embeddings(e_embs, v_embs)
+    acc = evaluate_topk(avg, avg, fns, fns, labels, k=k)
+    wandb.log({"model": "eff+vit", "topk_acc": acc, "avg_time_per_image": None, "type": "ensemble"})
 
     wandb.finish()
