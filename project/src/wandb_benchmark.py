@@ -68,10 +68,10 @@ def evaluate_topk(query_embs, gallery_embs, query_names, gallery_names, labels, 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     img_size = 224
-    data_dir = "./data/val"
+    data_dir = "./project/training"
     val_json = "val_split.json"
     batch_size = 64
-    k = 5
+    k = 3
 
     with open(val_json) as f:
         labels = json.load(f)  # {"filename.jpg": "classname"}
