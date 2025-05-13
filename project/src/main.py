@@ -7,6 +7,39 @@ from data import make_transforms, RetrievalDataset
 from model import build_model, extract_embedding_model
 from retrieve import build_index  # assumes build_index in retrieve.py
 
+# import benchmark functions
+from wandb_benchmark import get_backbone, extract_embeddings, evaluate_topk
+
+
+def choose_best_model(train_dir, val_json, img_size, batch_size, k=3, device=None):
+    """
+    Benchmarks available backbones on retrieval accuracy and average inference time,
+    returns the model name with highest accuracy (ties broken by lower avg_time).
+    """
+    # Load labels for validation
+    with open(val_json) as f:
+        labels = json.load(f)
+    # Prepare transforms and loader
+    tfm = make_transforms(img_size, train=False)
+    loader = DataLoader(RetrievalDataset(train_dir, tfm), batch_size=batch_size, shuffle=False, num_workers=4)
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    candidates = ["resnet50", "efficientnet_b0", "vit_b_16"]
+    results = []
+    for name in candidates:
+        model, _ = get_backbone(name)
+        embs, fnames, avg_time = extract_embeddings(model, loader, device)
+        acc = evaluate_topk(embs, embs, fnames, fnames, labels, k)
+        print(f"Benchmark {name}: acc={acc:.4f}, avg_time_per_image={avg_time:.4f}s")
+        results.append((name, acc, avg_time))
+    # select best by acc, then time
+    results.sort(key=lambda x: (-x[1], x[2]))
+    best_name, best_acc, best_time = results[0]
+    print(f"→ Selected model: {best_name} (acc={best_acc:.4f}, time={best_time:.4f}s)")
+    return best_name
+
+
 def do_split(args):
     classes = os.listdir(args.train_dir)
     train_labels, val_labels = {}, {}
@@ -25,8 +58,10 @@ def do_split(args):
     json.dump(val_labels,   open(args.val_json,   'w'), indent=2)
     print(f"→ train: {len(train_labels)}  val: {len(val_labels)}")
 
+
 def do_train(args):
     train_main(args)
+
 
 def do_index(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,10 +69,11 @@ def do_index(args):
     cls.load_state_dict(torch.load(args.ft_model, map_location='cpu'))
     cls.eval()
     gallery_ds = RetrievalDataset(args.gallery_dir, make_transforms(args.img_size, False))
-    idx, keys = build_index(cls, gallery_ds, device, args.model_name)
+    idx, keys = build_index(cls, gallery_ds, device)
     faiss.write_index(idx, args.idx_out)
     json.dump(keys, open(args.keys_out, 'w'), indent=2)
     print(f"✔ gallery index: {idx.ntotal} vectors saved to {args.idx_out}")
+
 
 def do_retrieve(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -61,20 +97,22 @@ def do_retrieve(args):
     json.dump(out, open(args.out_json, 'w'), indent=2)
     print(f"✔ wrote {args.out_json} for {len(out)} queries")
 
+
 def main():
-    p = argparse.ArgumentParser(description="Unified pipeline CLI")
+    p = argparse.ArgumentParser(description="Unified pipeline CLI with automated model selection")
     sub = p.add_subparsers(dest='cmd')
+    # split
     sp = sub.add_parser('split')
     sp.add_argument('--train_dir', required=True)
     sp.add_argument('--train_json', required=True)
     sp.add_argument('--val_json', required=True)
     sp.add_argument('--split_ratio', type=float, default=0.8)
-
+    # train
     tp = sub.add_parser('train')
     for a in ['train_dir','train_json','val_dir','val_json','num_classes','img_size','bs','lr','epochs','out_model']:
         tp.add_argument(f'--{a}', required=a.endswith('dir') or a.endswith('json') or a=='out_model')
     tp.add_argument('--model_name', default='efficientnet_b0')
-
+    # index
     ip = sub.add_parser('index')
     ip.add_argument('--ft_model', required=True)
     ip.add_argument('--gallery_dir', required=True)
@@ -83,7 +121,7 @@ def main():
     ip.add_argument('--keys_out', default='gallery_keys.json')
     ip.add_argument('--num_classes', type=int, default=10)
     ip.add_argument('--model_name', default='efficientnet_b0')
-
+    # retrieve
     rp = sub.add_parser('retrieve')
     rp.add_argument('--ft_model', required=True)
     rp.add_argument('--query_dir', required=True)
@@ -94,7 +132,7 @@ def main():
     rp.add_argument('--out_json', default='submission.json')
     rp.add_argument('--num_classes', type=int, default=10)
     rp.add_argument('--model_name', default='efficientnet_b0')
-
+    # full pipeline
     fp = sub.add_parser('full')
     fp.add_argument('--train_dir', required=True)
     fp.add_argument('--val_dir', required=True)
@@ -107,12 +145,12 @@ def main():
     fp.add_argument('--bs', type=int, default=32)
     fp.add_argument('--lr', type=float, default=1e-4)
     fp.add_argument('--epochs', type=int, default=10)
-    fp.add_argument('--k', type=int, default=5)
+    fp.add_argument('--k', type=int, default=3)
     fp.add_argument('--out_model', default='best_ft.pth')
     fp.add_argument('--idx_out', default='gallery_idx.faiss')
     fp.add_argument('--keys_out', default='gallery_keys.json')
     fp.add_argument('--out_json', default='submission.json')
-    fp.add_argument('--model_name', default='efficientnet_b0')
+    # note: model_name for full is selected automatically
 
     args = p.parse_args()
     if args.cmd == 'split':
@@ -124,16 +162,60 @@ def main():
     elif args.cmd == 'retrieve':
         do_retrieve(args)
     elif args.cmd == 'full':
+        # 1) split
         do_split(args)
-        train_args = argparse.Namespace(**{k: getattr(args,k) for k in ['train_dir','train_json','val_dir','val_json','num_classes','img_size','bs','lr','epochs','out_model','model_name']})
+        # 2) automatic model selection via retrieval benchmark
+        best_model = choose_best_model(
+            train_dir=args.train_dir,
+            val_json=args.val_json,
+            img_size=args.img_size,
+            batch_size=args.bs,
+            k=args.k
+        )
+        # 3) training
+        train_args = argparse.Namespace(
+            train_dir=args.train_dir,
+            train_json=args.train_json,
+            val_dir=args.val_dir,
+            val_json=args.val_json,
+            num_classes=args.num_classes,
+            img_size=args.img_size,
+            bs=args.bs,
+            lr=args.lr,
+            epochs=args.epochs,
+            out_model=args.out_model,
+            model_name=best_model
+        )
         do_train(train_args)
-        idx_args = argparse.Namespace(ft_model=args.out_model, gallery_dir=os.path.join(args.test_dir,'gallery'), img_size=args.img_size, idx_out=args.idx_out, keys_out=args.keys_out, num_classes=args.num_classes, model_name=args.model_name)
+        # 4) build index on test gallery
+        idx_args = argparse.Namespace(
+            ft_model=args.out_model,
+            gallery_dir=os.path.join(args.test_dir,'gallery'),
+            img_size=args.img_size,
+            idx_out=args.idx_out,
+            keys_out=args.keys_out,
+            num_classes=args.num_classes,
+            model_name=best_model
+        )
         do_index(idx_args)
-        ret_args = argparse.Namespace(ft_model=args.out_model, query_dir=os.path.join(args.test_dir,'query'), idx=args.idx_out, keys=args.keys_out, k=args.k, img_size=args.img_size, out_json=args.out_json, num_classes=args.num_classes, model_name=args.model_name)
+        # 5) retrieve on test queries
+        ret_args = argparse.Namespace(
+            ft_model=args.out_model,
+            query_dir=os.path.join(args.test_dir,'query'),
+            idx=args.idx_out,
+            keys=args.keys_out,
+            k=args.k,
+            img_size=args.img_size,
+            out_json=args.out_json,
+            num_classes=args.num_classes,
+            model_name=best_model
+        )
         do_retrieve(ret_args)
     else:
         p.print_help()
 
 if __name__ == '__main__':
     main()
-
+# Note: This script assumes the existence of a wandb_benchmark.py file with the required functions.
+# The script is designed to be run from the command line with various subcommands for different tasks.
+# The full pipeline automates the process of splitting data, selecting the best model, training, indexing, and retrieving.
