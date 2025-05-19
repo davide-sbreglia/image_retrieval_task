@@ -93,7 +93,8 @@ def do_retrieve(args):
             e = torch.nn.functional.normalize(e, p=2, dim=1).cpu().numpy().astype('float32')
             D, I = idx.search(e, args.k)
             for fn, nbrs in zip(fns, I):
-                out.append({'filename': fn, 'samples': [gallery[i] for i in nbrs]})
+                out.append({"filename": os.path.join("test_folder", "query_images", fn),
+                            "gallery_images": [os.path.join("test_folder", "gallery_images", gallery[i]) for i in nbrs]})
     json.dump(out, open(args.out_json, 'w'), indent=2)
     print(f"✔ wrote {args.out_json} for {len(out)} queries")
 
