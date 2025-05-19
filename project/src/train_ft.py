@@ -31,9 +31,11 @@ def validate(model, loader, loss_fn, device):
 
 def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # Datasets (labels JSON will be provided at competition)
+    # Datasets (train & val both live under train_dir; split controlled by JSONs)
     train_ds = ClassifyDataset(args.train_dir, args.train_json, make_transforms(args.img_size, True))
-    val_ds   = ClassifyDataset(args.val_dir,   args.val_json,   make_transforms(args.img_size, False))
+    val_ds   = ClassifyDataset(args.train_dir, args.val_json,   make_transforms(args.img_size, False))
+    # DataLoaders
+    # NOTE: num_workers=4 is a good default, but you may need to adjust this
     tr_dl = DataLoader(train_ds, batch_size=args.bs, shuffle=True,  num_workers=4)
     va_dl = DataLoader(val_ds,   batch_size=args.bs, shuffle=False, num_workers=4)
 
@@ -55,7 +57,6 @@ if __name__=="__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--train_dir",     required=True)
     p.add_argument("--train_json",    required=True)
-    p.add_argument("--val_dir",       required=True)
     p.add_argument("--val_json",      required=True)
     p.add_argument("--num_classes",   type=int, default=10)
     p.add_argument("--img_size",      type=int, default=224)

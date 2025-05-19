@@ -1,4 +1,5 @@
 import os, json, random, argparse
+from PIL import Image
 import torch, faiss
 import numpy as np
 from torch.utils.data import DataLoader
@@ -19,20 +20,62 @@ def choose_best_model(train_dir, val_json, img_size, batch_size, k=3, device=Non
     # Load labels for validation
     with open(val_json) as f:
         labels = json.load(f)
-    # Prepare transforms and loader
+    # --- Split into query/gallery filenames ---
+    all_fns = list(labels.keys())
+    random.shuffle(all_fns)
+    split = int(0.2 * len(all_fns))  # 20% for query
+    query_fns = set(all_fns[:split])
+    gallery_fns = set(all_fns[split:])
+
+    # --- Filter labels ---
+    query_labels   = {k: labels[k] for k in query_fns}
+    gallery_labels = {k: labels[k] for k in gallery_fns}
+
+    # --- Custom subset datasets ---
     tfm = make_transforms(img_size, train=False)
-    loader = DataLoader(RetrievalDataset(train_dir, tfm), batch_size=batch_size, shuffle=False, num_workers=4)
+    val_dir = train_dir  # all validation images are in the same folder
+
+    def subset_dataset(filenames):
+        from pathlib import Path
+        from torch.utils.data import Dataset
+        class SubsetRetrievalDataset(Dataset):
+            def __init__(self, root, transform, keep_set):
+                self.transform = transform
+                self.samples = []
+                for cls in sorted(os.listdir(root)):
+                    folder = os.path.join(root, cls)
+                    if not os.path.isdir(folder):
+                        continue
+                    for fn in os.listdir(folder):
+                        if fn in keep_set:
+                            self.samples.append((os.path.join(folder, fn), fn))
+            def __len__(self): return len(self.samples)
+            def __getitem__(self, idx):
+                path, fn = self.samples[idx]
+                img = Image.open(path).convert("RGB")
+                return self.transform(img), fn
+        return SubsetRetrievalDataset(val_dir, tfm, filenames)
+
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    candidates = ["resnet50", "efficientnet_b0", "vit_b_16"]
     results = []
+    candidates = ["resnet50", "efficientnet_b0", "vit_b_16"]
+
     for name in candidates:
         model, _ = get_backbone(name)
-        embs, fnames, avg_time = extract_embeddings(model, loader, device)
-        acc = evaluate_topk(embs, embs, fnames, fnames, labels, k)
-        print(f"Benchmark {name}: acc={acc:.4f}, avg_time_per_image={avg_time:.4f}s")
-        results.append((name, acc, avg_time))
+        query_ds = subset_dataset(query_fns)
+        gallery_ds = subset_dataset(gallery_fns)
+
+        query_dl = DataLoader(query_ds, batch_size=batch_size, shuffle=False, num_workers=4)
+        gallery_dl = DataLoader(gallery_ds, batch_size=batch_size, shuffle=False, num_workers=4)
+
+        query_embs, query_names, q_time = extract_embeddings(model, query_dl, device)
+        gallery_embs, gallery_names, _ = extract_embeddings(model, gallery_dl, device)
+
+        acc = evaluate_topk(query_embs, gallery_embs, query_names, gallery_names, labels, k)
+        print(f"Benchmark {name}: acc={acc:.4f}, avg_time_per_image={q_time:.4f}s")
+        results.append((name, acc, q_time))
     # select best by acc, then time
     results.sort(key=lambda x: (-x[1], x[2]))
     best_name, best_acc, best_time = results[0]
@@ -110,7 +153,7 @@ def main():
     sp.add_argument('--split_ratio', type=float, default=0.8)
     # train
     tp = sub.add_parser('train')
-    for a in ['train_dir','train_json','val_dir','val_json','num_classes','img_size','bs','lr','epochs','out_model']:
+    for a in ['train_dir','train_json','val_json','num_classes','img_size','bs','lr','epochs','out_model']:
         tp.add_argument(f'--{a}', required=a.endswith('dir') or a.endswith('json') or a=='out_model')
     tp.add_argument('--model_name', default='efficientnet_b0')
     # index
@@ -136,7 +179,6 @@ def main():
     # full pipeline
     fp = sub.add_parser('full')
     fp.add_argument('--train_dir', required=True)
-    fp.add_argument('--val_dir', required=True)
     fp.add_argument('--test_dir', required=True)
     fp.add_argument('--train_json', default='train_split.json')
     fp.add_argument('--val_json', default='val_split.json')
@@ -177,7 +219,6 @@ def main():
         train_args = argparse.Namespace(
             train_dir=args.train_dir,
             train_json=args.train_json,
-            val_dir=args.val_dir,
             val_json=args.val_json,
             num_classes=args.num_classes,
             img_size=args.img_size,
