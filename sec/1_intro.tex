@@ -1,0 +1,29 @@
+\section{Introduction}
+\label{sec:intro}
+\subsection{Task Description}
+
+In this project, we address the problem of image-based retrieval in a closed-set scenario, where the objective is to return the most visually and semantically similar images from a gallery set, given a query image. The metric of interest is top-k retrieval accuracy, which quantifies the proportion of times a relevant image appears among the k nearest neighbors retrieved for a given query.
+The dataset provided follows a structured format, separating the data into \textbf{training},\textbf{ test/query}, and \textbf{test/gallery} folders. The training data is used to fine-tune models on class-labeled images, while retrieval is performed on test queries against the gallery without using explicit class labels at inference time.
+
+\subsection{Overview of Approaches}
+To tackle this problem, we design a multi-stage pipeline that integrates:
+
+(i) model selection via benchmarking; 
+(ii) supervised fine-tuning of selected architectures; 
+(iii) embedding extraction and L2 normalization;
+(iv) similarity-based retrieval using cosine similarity through FAISS indexing.
+
+We evaluate multiple backbone models pre-trained on ImageNet, including:
+
+\textbf{ResNet-50}: a convolutional residual network,
+
+\textbf{EfficientNet-B0}: a lightweight and efficient CNN architecture,
+
+\textbf{Vision Transformer (ViT-B/16)}: a transformer-based image encoder.
+
+In addition to individual models, we implement ensemble strategies by averaging embeddings from multiple backbones to leverage complementary feature representations. The pipeline includes both classification-based training (to adapt the models to the dataset) and embedding-based retrieval.
+
+\subsection{Summary of Results}
+Our evaluation includes both single-model and ensemble methods across a consistent validation split. Using the top-10 accuracy as the key metric, we found that the X model outperformed all single models, achieving a notable improvement in retrieval performance. Fine-tuning also led to significant gains over using frozen features. Quantitative results are supported by qualitative visual inspection of retrieved samples.
+.... (da fare post competition)
+
