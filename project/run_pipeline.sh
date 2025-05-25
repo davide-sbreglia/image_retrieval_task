@@ -13,12 +13,12 @@ TRAIN_JSON="train_split.json"
 VAL_JSON="val_split.json"
 SPLIT_RATIO=0.8
 
-NUM_CLASSES=102
+NUM_CLASSES=200
 IMG_SIZE=224
 BS=32
 LR=0.1
-EPOCHS=10
-K=2
+EPOCHS=3
+K=10
 
 OUT_MODEL="best_ft.pth"
 IDX_OUT="gallery_idx.faiss"

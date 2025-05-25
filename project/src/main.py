@@ -108,11 +108,11 @@ def do_train(args):
 
 def do_index(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    cls = build_model(args.num_classes, model_name=args.model_name).to(device)
-    cls.load_state_dict(torch.load(args.ft_model, map_location='cpu'))
-    cls.eval()
+    full_model = build_model(args.num_classes, model_name=args.model_name).to(device)
+    full_model.load_state_dict(torch.load(args.ft_model, map_location='cpu'))
+    embed = extract_embedding_model(full_model, model_name=args.model_name).to(device).eval()
     gallery_ds = RetrievalDataset(args.gallery_dir, make_transforms(args.img_size, False))
-    idx, keys = build_index(cls, gallery_ds, device)
+    idx, keys = build_index(embed, gallery_ds, device)
     faiss.write_index(idx, args.idx_out)
     json.dump(keys, open(args.keys_out, 'w'), indent=2)
     print(f"✔ gallery index: {idx.ntotal} vectors saved to {args.idx_out}")
