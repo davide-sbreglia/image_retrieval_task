@@ -39,7 +39,7 @@ def main(args):
     tr_dl = DataLoader(train_ds, batch_size=args.bs, shuffle=True,  num_workers=4)
     va_dl = DataLoader(val_ds,   batch_size=args.bs, shuffle=False, num_workers=4)
 
-    model   = build_model(num_classes=args.num_classes).to(device)
+    model   = build_model(num_classes=args.num_classes,model_name=args.model_name).to(device)
     loss_fn = nn.CrossEntropyLoss()
     # only train the classifier head
     opt = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
