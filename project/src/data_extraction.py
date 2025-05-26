@@ -17,7 +17,7 @@ def download_data():
         print("📦 Dataset non trovato, avvio download da Google Drive...")
 
         # Link diretto al file
-        url = "https://drive.google.com/file/d/19e1sgLQHIV4ck5SIsfOQI2cz4V5eJqHh/view?usp=sharing"
+        url = "https://drive.google.com/file/d/13vafFIf65g5sqnC2jMY82JIJsSsOC2QQ/view?usp=drive_link"
 
         # Scarica con gdown
         gdown.download(url, zip_path, quiet=False, fuzzy= True)
