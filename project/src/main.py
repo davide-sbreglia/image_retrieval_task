@@ -129,6 +129,7 @@ def do_retrieve(args):
     dl = DataLoader(query_ds, batch_size=args.k, shuffle=False, num_workers=4)
     embed = extract_embedding_model(cls, model_name=args.model_name).to(device).eval()
     out = []
+    #out={} -> to use in case of dictionary output instead of json
     with torch.no_grad():
         for X, fns in dl:
             X = X.to(device)
@@ -138,8 +139,11 @@ def do_retrieve(args):
             for fn, nbrs in zip(fns, I):
                 out.append({"filename": os.path.join("test_folder", "query_images", fn),
                             "gallery_images": [os.path.join("test_folder", "gallery_images", gallery[i]) for i in nbrs]})
+            #for fn, nbrs in zip(fns, I):
+                #out[fn] = [gallery[i] for i in nbrs]
     json.dump(out, open(args.out_json, 'w'), indent=2)
     print(f"✔ wrote {args.out_json} for {len(out)} queries")
+    #submit(out, "MLOps")
 
 
 def main():
