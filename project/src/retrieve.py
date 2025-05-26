@@ -5,9 +5,9 @@ from torchvision import transforms
 from data  import ClassifyDataset, make_transforms
 from model import build_model, extract_embedding_model
 
-def build_index(model, ds, device="cuda"):
+def build_index(embedder, ds, device="cuda"):
     dl = DataLoader(ds, batch_size=64, shuffle=False, num_workers=4)
-    embedder = extract_embedding_model(model).to(device).eval()
+    embedder = embedder.to(device).eval()
     embs, keys = [], []
     with torch.no_grad():
         for batch in dl:
