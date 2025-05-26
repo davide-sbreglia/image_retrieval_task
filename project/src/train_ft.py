@@ -64,4 +64,5 @@ if __name__=="__main__":
     p.add_argument("--lr",            type=float, default=1e-3)
     p.add_argument("--epochs",        type=int,   default=10)
     p.add_argument("--out_model",     default="best_ft.pth")
+    p.add_argument("--model_name",    default="efficientnet_b0")
     main(p.parse_args())
