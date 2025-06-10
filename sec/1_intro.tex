@@ -2,28 +2,87 @@
 \label{sec:intro}
 \subsection{Task Description}
 
-In this project, we address the problem of image-based retrieval in a closed-set scenario, where the objective is to return the most visually and semantically similar images from a gallery set, given a query image. The metric of interest is top-k retrieval accuracy, which quantifies the proportion of times a relevant image appears among the k nearest neighbors retrieved for a given query.
-The dataset provided follows a structured format, separating the data into \textbf{training},\textbf{ test/query}, and \textbf{test/gallery} folders. The training data is used to fine-tune models on class-labeled images, while retrieval is performed on test queries against the gallery without using explicit class labels at inference time.
+The machine learning competition set by our course was an image-to-image retrieval competition.  
+For every \emph{query} image (a real photograph of a celebrity), our system had to return the $k$ most similar \emph{gallery} images, which were synthetic renders of the same people.  
+The professors provided:
+
+\begin{itemize}
+  \item a \texttt{train} folder (optional) with labelled images for fine-tuning
+  \item a hidden \texttt{test/query} folder (real photos)
+  \item a hidden \texttt{test/gallery} folder (synthetic images)
+\end{itemize}
+
+Teams had to upload a single \texttt{submission.json} file that, for each query filename, listed the $k$ gallery filenames in order of similarity.  
+Results were scored with Top-$k$ Accuracy. If the correct identity appears anywhere in the first $k$ returned images the sample is counted as correct; otherwise it is counted as wrong.  
+Scores were reported for $k\!=\!1,5,10$ and summed to give the final leaderboard rank.
+
+Three factors made the task non-trivial:
+
+\begin{enumerate}
+  \item {Domain gap}: the query and gallery images come from different sources. The query set contains real-world photos of celebrities, while the gallery consists of synthetic face renders. These two domains differ in lighting, texture, style and resolution, which makes feature matching harder.
+  \item {Strict time limit}: teams were given only two hours of compute time during the in-class competition to complete everything: model selection, fine-tuning, indexing, and submission. This forced us to use fast and reliable choices with minimal tuning.
+  \item {Hidden labels}: the test set came without any identity annotations. While we could submit predictions and receive a final score, we had no way to see which samples were correct or incorrect. This made it impossible to fine-tune or calibrate the system based on test feedback.
 
 \subsection{Overview of Approaches}
-To tackle this problem, we design a multi-stage pipeline that integrates:
 
-(i) model selection via benchmarking; 
-(ii) supervised fine-tuning of selected architectures; 
-(iii) embedding extraction and L2 normalization;
-(iv) similarity-based retrieval using cosine similarity through FAISS indexing.
+Our team built an image–retrieval pipeline that converts every picture into a 512-dimensional feature vector and compares vectors with cosine similarity. The key idea is to reuse strong ImageNet backbones, fine-tune only their classification heads, and select the best model through an automatic benchmark.  All steps were done by the script
+\texttt{run\_pipeline.sh}.  Figure~\ref{fig:pipeline} illustrates the flow; the
+numbered list below explains every stage and references the main code files.
 
-We evaluate multiple backbone models pre-trained on ImageNet, including:
+\begin{enumerate}
+  \item {Data split} (main.py split)}.  
+        The 4 605 training images (921 identities $\times$ 5 pictures) are divided 80\,\% / 20\,\% into \texttt{train\_split.json} and
+        \texttt{val\_split.json} using the flag
+        \texttt{--split\_ratio 0.8}.  The split is identity-stratified so that no person appears in both sets.
 
-\textbf{ResNet-50}: a convolutional residual network,
+  \item {Automatic benchmark
+        (choose\_best\_model in main.py)}.
+        Three ImageNet pre-trained encoders are compared:
+        \textsc{ResNet-50}, \textsc{EfficientNet-B0} and \textsc{ViT-B/16}.
+        For each backbone the function
+        \texttt{evaluate\_topk()} measures Top-5 Accuracy on the validation
+        split, and \texttt{extract\_embeddings()} records average inference
+        time per image.  Results are sorted by highest accuracy and, in
+        case of ties, by lowest latency.  The winning name is returned
+        and printed to the console.
 
-\textbf{EfficientNet-B0}: a lightweight and efficient CNN architecture,
+  \item {Fine-tuning the selected backbone
+        (train\_ft.py)}.  
+        Using the learning rate–epochs–batch parameters from
+        \texttt{run\_pipeline.sh}  
+        \smallskip \\
+        \quad \texttt{LR=0.1,\; EPOCHS=3,\; BS=32} \\
+        \smallskip
+        we freeze all feature layers (\texttt{requires\_grad=False}) inside
+        \texttt{model.build\_model()} and train only the new classifier head
+        with \texttt{Adam}.
 
-\textbf{Vision Transformer (ViT-B/16)}: a transformer-based image encoder.
+  \item {Embedding extraction}.  
+        After training we discard the classifier and construct an
+        embedding model with
+        \texttt{model.extract\_embedding\_model()}:
+        \begin{enumerate}
+          \item Backbone feature map  
+          \item Projection Head: a single fully-connected layer
+                (\texttt{ProjectionHead} in wandb\_benchmark.py) that
+                maps features to a 512-dimensional vector
+          \item L2 normalisation: the \texttt{L2Norm} module in
+                model.py scales each vector to unit length so a dot
+                product equals cosine similarity
+        \end{enumerate}
 
-In addition to individual models, we implement ensemble strategies by averaging embeddings from multiple backbones to leverage complementary feature representations. The pipeline includes both classification-based training (to adapt the models to the dataset) and embedding-based retrieval.
+  \item Gallery indexing
+        (main.py index)}.  
+        All 1 481 gallery embeddings are computed once and stored in a
+        \texttt{faiss.IndexFlatIP} index (inner product).  Corresponding
+        filenames are saved to \texttt{gallery\_keys.json}.
 
-\subsection{Summary of Results}
-Our evaluation includes both single-model and ensemble methods across a consistent validation split. Using the top-10 accuracy as the key metric, we found that the X model outperformed all single models, achieving a notable improvement in retrieval performance. Fine-tuning also led to significant gains over using frozen features. Quantitative results are supported by qualitative visual inspection of retrieved samples.
-.... (da fare post competition)
+  \item Query retrieval
+        (main.py retrieve)}.  
+        Each of the 1 456 query images is embedded the same way, normalised,
+        and searched against the FAISS index.  The top $k$ neighbours are
+        returned and written to \texttt{submission.json}.
+
+  \item {Submission}.  
+        The JSON file is uploaded to the competition server.
 
