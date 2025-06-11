@@ -85,4 +85,6 @@ numbered list below explains every stage and references the main code files.
 
   \item {Submission}.  
         The JSON file is uploaded to the competition server.
+      
+A separate script (\textit{ensemble\_retrieve.py}) shows that averaging ResNet-50 and ViT-B/16 embeddings can add 1–2 percentage points of Top-1 accuracy, but it doubles indexing time. In addition, during training we applied the default augmentation in \texttt{data.make\_transforms(image\_size, train=True)}: random resized-crop and horizontal flip.
 
