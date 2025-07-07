@@ -1,6 +1,6 @@
 # Top-k Image Retrieval Pipeline
 
-This repository contains our solution for the Image Retrieval Competition in the Introduction to Machine Learning course at the University of Trento (2024). The goal is to retrieve the top-k most similar gallery images for each query image, matching real celebrity photos to synthetic renders.
+This repository contains our solution for the Image Retrieval Competition in the Introduction to Machine Learning course at the University of Trento (2025). The goal is to retrieve the top-k most similar gallery images for each query image, matching real celebrity photos to synthetic renders.
 
 ## Project Structure
 
@@ -10,8 +10,8 @@ ML Project/
 ├── MLOps_project/
 │   ├── project/
 │   │   └── src/       # Main code: training, retrieval, ensemble, etc.
-│   ├── sec/           # Report sections (LaTeX)
-│   └── ...            # Report, scripts, and supplementary files
+│   ├── report/        # Report sections (LaTeX)
+│   └── ...            
 ```
 
 ## Main Features
@@ -20,7 +20,6 @@ ML Project/
 - **Training:** Fine-tuning only the classifier head; backbone frozen
 - **Retrieval:** Embeddings projected to 512-D, L2-normalized, compared via cosine similarity
 - **Indexing:** Fast nearest-neighbor search with FAISS
-- **Ensemble:** Optional late-fusion of model embeddings
 - **Automated pipeline:** Full workflow via `run_pipeline.sh`
 
 ## How to Run
@@ -70,5 +69,5 @@ A detailed technical report is provided in the `MLOps_project/` folder, includin
 
 ## Authors
 
-Project developed by Paolo and team for the Introduction to Machine Learning course, University of Trento (2024).
+Project developed by Camilla Bonomo, Paolo Fabbri, Davide Sbreglia, University of Trento (2025).
 
