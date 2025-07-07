@@ -24,13 +24,8 @@ ML Project/
 
 ## How to Run
 
-1. **Install dependencies**  
-   (Recommended: Python 3.8+, PyTorch, torchvision, faiss, etc.)
-   ```
-   pip install -r requirements.txt
-   ```
 
-2. **Prepare the dataset**  
+1. **Prepare the dataset**  
    Place the competition dataset in the `Dataset/` folder, following the structure:
    ```
    Dataset/
@@ -40,14 +35,14 @@ ML Project/
        └── gallery/
    ```
 
-3. **Run the full pipeline**
+2. **Run the full pipeline**
    ```
    cd MLOps_project/project
    bash run_pipeline.sh <path_to_train> <path_to_test>
    ```
    This script splits the data, benchmarks models, trains, indexes, retrieves, and generates the submission file.
 
-4. **Submission**  
+3. **Submission**  
    The output `submission.json` can be uploaded to the competition portal.
 
 ## Key Scripts
