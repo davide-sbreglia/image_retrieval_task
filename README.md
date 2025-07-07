@@ -64,7 +64,7 @@ A detailed technical report is provided in the `MLOps_project/` folder, includin
 
 ## Authors
 
-- [Camilla](https://github.com/camillabonomo02)
-- [Paolo](https://github.com/PaoloFabbri8)
-- [Davide](https://github.com/davide-sbreglia)
+- [Camilla Bonomo](https://github.com/camillabonomo02)
+- [Paolo Fabbri](https://github.com/PaoloFabbri8)
+- [Davide Sbreglia](https://github.com/davide-sbreglia)
 
