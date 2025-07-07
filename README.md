@@ -64,5 +64,7 @@ A detailed technical report is provided in the `MLOps_project/` folder, includin
 
 ## Authors
 
-Project developed by Camilla Bonomo, Paolo Fabbri, Davide Sbreglia, University of Trento (2025).
+- [Camilla](https://github.com/camillabonomo02)
+- [Paolo]((https://github.com/PaoloFabbri8))
+- [Davide]((https://github.com/davide-sbreglia))
 
