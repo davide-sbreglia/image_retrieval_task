@@ -63,8 +63,6 @@ ML Project/
 A detailed technical report is provided in the `MLOps_project/` folder, including methodology, experiments, and results.
 
 ## Authors
-
-- [Camilla Bonomo](https://github.com/camillabonomo02)
 - [Paolo Fabbri](https://github.com/PaoloFabbri8)
 - [Davide Sbreglia](https://github.com/davide-sbreglia)
 
